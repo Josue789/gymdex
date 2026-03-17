@@ -298,4 +298,24 @@ class Ejercicioservice {
       // Opcional: await txn.delete('ejercicios'); si quisieras borrar el catálogo también
     });
   }
+
+  /// Obtener rutina por día de la semana
+  Future<Rutina?> getRoutineByDay(String day) async {
+    final db = await DatabaseHelper.instance.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'rutinas',
+      where: 'LOWER(dia) = LOWER(?)',
+      whereArgs: [day],
+      limit: 1, // Solo necesitamos la primera coincidencia
+    );
+
+    if (maps.isNotEmpty) {
+      return Rutina(
+        id: maps.first['id'],
+        nombre: maps.first['nombre'],
+        dia: maps.first['dia'],
+      );
+    }
+    return null; // No se encontró rutina para ese día
+  }
 }

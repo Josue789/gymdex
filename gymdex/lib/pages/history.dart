@@ -37,33 +37,36 @@ class _HistoryState extends State<History> {
         largeTitle: const Text("Progreso"),
       ),
       child: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: SizedBox(
-                width: double.infinity,
-                child: CupertinoSlidingSegmentedControl<int>(
-                  groupValue: _selectedSegment,
-                  children: const {
-                    0: Text("Historial"),
-                    1: Text("Récords (PR)"),
-                  },
-                  onValueChanged: (value) {
-                    setState(() {
-                      _selectedSegment = value!;
-                    });
-                  },
+        child: Material(
+          color: Colors.transparent,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: CupertinoSlidingSegmentedControl<int>(
+                    groupValue: _selectedSegment,
+                    children: const {
+                      0: Text("Historial"),
+                      1: Text("Récords (PR)"),
+                    },
+                    onValueChanged: (value) {
+                      setState(() {
+                        _selectedSegment = value!;
+                      });
+                    },
+                  ),
                 ),
               ),
-            ),
-            Expanded(
-              flex: 1,
-              child: _selectedSegment == 0
-                  ? _buildHistoryList()
-                  : _buildPrList(),
-            ),
-          ],
+              Expanded(
+                flex: 1,
+                child: _selectedSegment == 0
+                    ? _buildHistoryList()
+                    : _buildPrList(),
+              ),
+            ],
+          ),
         ),
       ),
     );

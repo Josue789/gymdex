@@ -20,95 +20,99 @@ class _SettingsState extends State<Settings> {
         largeTitle: const Text("Configuración"),
       ),
       child: SafeArea(
-        child: ListView(
-          children: [
-            // Sección de apariencia
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text(
-                "APARIENCIA",
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+        child: Material(
+          color: Colors.transparent,
+          child: ListView(
+            children: [
+              // Sección de apariencia
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(
+                  "APARIENCIA",
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
               ),
-            ),
-            Card(
-              margin: EdgeInsets.symmetric(horizontal: 16),
-              child: SwitchListTile(
-                secondary: Icon(Icons.dark_mode),
-                title: Text("Modo oscuro"),
-                value: ThemeManager.instance.themeMode.value == ThemeMode.dark,
-                onChanged: (val) {
-                  setState(() {
-                    ThemeManager.instance.toggleTheme(val);
-                  });
-                },
+              Card(
+                margin: EdgeInsets.symmetric(horizontal: 16),
+                child: SwitchListTile(
+                  secondary: Icon(Icons.dark_mode),
+                  title: Text("Modo oscuro"),
+                  value:
+                      ThemeManager.instance.themeMode.value == ThemeMode.dark,
+                  onChanged: (val) {
+                    setState(() {
+                      ThemeManager.instance.toggleTheme(val);
+                    });
+                  },
+                ),
               ),
-            ),
 
-            // Sección de datos
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-              child: Text(
-                "DATOS Y ALMACENAMIENTO",
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+              // Sección de datos
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                child: Text(
+                  "DATOS Y ALMACENAMIENTO",
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
               ),
-            ),
-            Card(
-              margin: EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: Icon(Icons.fitness_center),
-                    title: Text("Gestionar ejercicios"),
-                    trailing: Icon(Icons.chevron_right),
-                    onTap: _gestionarEjercicios,
-                  ),
-                  Divider(height: 1),
-                  ListTile(
-                    leading: Icon(Icons.delete_forever, color: Colors.red),
-                    title: Text(
-                      "Borrar todos los datos",
-                      style: TextStyle(color: Colors.red),
+              Card(
+                margin: EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: Icon(Icons.fitness_center),
+                      title: Text("Gestionar ejercicios"),
+                      trailing: Icon(Icons.chevron_right),
+                      onTap: _gestionarEjercicios,
                     ),
-                    onTap: _confirmarBorrado,
-                  ),
-                ],
-              ),
-            ),
-
-            // Sección de información
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-              child: Text(
-                "ACERCA DE",
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-            ),
-            Card(
-              margin: EdgeInsets.symmetric(horizontal: 16),
-              child: ListTile(
-                leading: Icon(Icons.info_outline),
-                title: Text("Acerca de GymDex"),
-                trailing: Icon(Icons.chevron_right),
-                onTap: () {
-                  showCupertinoDialog(
-                    context: context,
-                    builder: (ctx) => CupertinoAlertDialog(
-                      title: Text("GymDex"),
-                      content: Text(
-                        "Versión 1.0.0\nTu compañero de entrenamiento.",
+                    Divider(height: 1),
+                    ListTile(
+                      leading: Icon(Icons.delete_forever, color: Colors.red),
+                      title: Text(
+                        "Borrar todos los datos",
+                        style: TextStyle(color: Colors.red),
                       ),
-                      actions: [
-                        CupertinoDialogAction(
-                          child: Text("Cerrar"),
-                          onPressed: () => Navigator.pop(ctx),
-                        ),
-                      ],
+                      onTap: _confirmarBorrado,
                     ),
-                  );
-                },
+                  ],
+                ),
               ),
-            ),
-          ],
+
+              // Sección de información
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                child: Text(
+                  "ACERCA DE",
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ),
+              Card(
+                margin: EdgeInsets.symmetric(horizontal: 16),
+                child: ListTile(
+                  leading: Icon(Icons.info_outline),
+                  title: Text("Acerca de GymDex"),
+                  trailing: Icon(Icons.chevron_right),
+                  onTap: () {
+                    showCupertinoDialog(
+                      context: context,
+                      builder: (ctx) => CupertinoAlertDialog(
+                        title: Text("GymDex"),
+                        content: Text(
+                          "Versión 1.0.0\nTu compañero de entrenamiento.",
+                        ),
+                        actions: [
+                          CupertinoDialogAction(
+                            child: Text("Cerrar"),
+                            onPressed: () => Navigator.pop(ctx),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
