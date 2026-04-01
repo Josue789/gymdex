@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:gymdex/models/ejercicio.dart';
 import 'package:gymdex/models/rutina.dart';
 import 'package:gymdex/service/ejercicioService.dart';
@@ -71,54 +72,73 @@ class _TraineState extends State<Traine> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text("Entrenamiento")),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _finishWorkout,
-        child: Icon(Icons.stop_rounded),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: FloatingActionButton(
+          backgroundColor: Colors.red,
+          foregroundColor: Colors.white,
+          onPressed: _finishWorkout,
+          child: const Icon(Icons.stop_rounded),
+        ),
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Card(
-              color: Colors.white70,
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.max,
-                      children: [
-                        Text("Progeso de rutina"),
-                        Chip(
-                          label: Text(
-                            "$terminado / ${ejercicios.length}",
-                            style: TextStyle(fontSize: 11),
+      body: GestureDetector(
+        onTap: () =>
+            FocusScope.of(context).unfocus(), // Cierra teclado al tocar fuera
+        child: SafeArea(
+          child: Column(
+            children: [
+              Card(
+                margin: EdgeInsets.all(10),
+                child: Padding(
+                  padding: const EdgeInsets.all(15),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.max,
+                        children: [
+                          Text(
+                            "Progreso de rutina",
+                            style: TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          backgroundColor: Colors.blueGrey,
-                          labelStyle: TextStyle(color: Colors.white),
+                          Chip(
+                            label: Text(
+                              "$terminado / ${ejercicios.length}",
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            padding: EdgeInsets.all(0),
+                            backgroundColor: Colors.blueGrey.shade100,
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 10),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: LinearProgressIndicator(
+                          minHeight: 10,
+                          value: ejercicios.isEmpty
+                              ? 0
+                              : terminado / ejercicios.length,
                         ),
-                      ],
-                    ),
-                    LinearProgressIndicator(
-                      value: ejercicios.isEmpty
-                          ? 0
-                          : terminado / ejercicios.length,
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            SizedBox(height: 10),
-            Expanded(
-              child: ListView(
-                padding: EdgeInsets.symmetric(horizontal: 10),
-                children: ejercicios.map((e) {
-                  return cardEjercicios(e);
-                }).toList(),
+              Expanded(
+                child: ListView(
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  children: ejercicios.map((e) {
+                    return cardEjercicios(e);
+                  }).toList(),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -129,6 +149,7 @@ class _TraineState extends State<Traine> {
     return Card(
       color: isComplete ? Colors.green.shade100 : null,
       elevation: 2,
+      clipBehavior: Clip.antiAlias, // Mejora bordes visuales
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -145,6 +166,22 @@ class _TraineState extends State<Traine> {
               ? Icon(Icons.check_circle, color: Colors.green)
               : Icon(Icons.keyboard_arrow_down),
           children: <Widget>[
+            if (ejercicio['ejercicio'].gifUrl != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: CachedNetworkImage(
+                    imageUrl: ejercicio['ejercicio'].gifUrl!,
+                    height: 150,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) =>
+                        const CupertinoActivityIndicator(),
+                    errorWidget: (context, url, error) =>
+                        const Icon(Icons.error),
+                  ),
+                ),
+              ),
             const Divider(height: 1),
             Padding(
               padding: const EdgeInsets.symmetric(
@@ -169,6 +206,20 @@ class _TraineState extends State<Traine> {
             ) {
               return _buildSetRow(set, ejercicio);
             }).toList(),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 8.0,
+              ),
+              child: OutlinedButton.icon(
+                onPressed: () => _addSet(ejercicio),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text("Agregar Set"),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(36),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -194,10 +245,15 @@ class _TraineState extends State<Traine> {
             width: 80,
             child: TextFormField(
               controller: setData['weight_controller'],
-              keyboardType: TextInputType.number,
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
+              textInputAction: TextInputAction.next,
               textAlign: TextAlign.center,
               decoration: InputDecoration(
                 hintText: "0.0",
+                contentPadding: EdgeInsets.symmetric(
+                  vertical: 10,
+                  horizontal: 5,
+                ),
                 border: OutlineInputBorder(),
               ),
             ),
@@ -206,10 +262,15 @@ class _TraineState extends State<Traine> {
             width: 80,
             child: TextFormField(
               controller: setData['reps_controller'],
-              keyboardType: TextInputType.number,
+              keyboardType: TextInputType.numberWithOptions(decimal: false),
+              textInputAction: TextInputAction.done,
               textAlign: TextAlign.center,
               decoration: InputDecoration(
                 hintText: "0",
+                contentPadding: EdgeInsets.symmetric(
+                  vertical: 10,
+                  horizontal: 5,
+                ),
                 border: OutlineInputBorder(),
               ),
             ),
@@ -229,6 +290,19 @@ class _TraineState extends State<Traine> {
         ],
       ),
     );
+  }
+
+  void _addSet(Map<String, dynamic> ejercicio) {
+    final sets = ejercicio['sets_data'] as List<Map<String, dynamic>>;
+    final int nextNumber = (sets.last['set_number'] as int) + 1;
+    setState(() {
+      sets.add({
+        'set_number': nextNumber,
+        'weight_controller': TextEditingController(),
+        'reps_controller': TextEditingController(),
+        'is_done': false,
+      });
+    });
   }
 
   void _updateProgress() {
@@ -264,8 +338,8 @@ class _TraineState extends State<Traine> {
               CupertinoDialogAction(
                 child: Text("Ok"),
                 onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.pop(context);
+                  Navigator.pop(context); // Cierra el diálogo
+                  _finishWorkout(); // Guarda y sale de la pantalla
                 },
               ),
             ],

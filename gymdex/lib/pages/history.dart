@@ -1,6 +1,8 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:gymdex/service/ejercicioService.dart';
+import 'package:intl/intl.dart';
 
 class History extends StatefulWidget {
   const History({super.key});
@@ -10,9 +12,8 @@ class History extends StatefulWidget {
 }
 
 class _HistoryState extends State<History> {
-  int _selectedSegment = 0;
   List<Map<String, dynamic>> _history = [];
-  List<Map<String, dynamic>> _prs = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -20,123 +21,135 @@ class _HistoryState extends State<History> {
     _loadData();
   }
 
-  void _loadData() async {
-    final history = await Ejercicioservice().getTrainingHistory();
-    final prs = await Ejercicioservice().getPersonalRecords();
-    setState(() {
-      _history = history;
-      _prs = prs;
-    });
+  Future<void> _loadData() async {
+    final data = await Ejercicioservice().getTrainingHistory();
+    if (mounted) {
+      setState(() {
+        _history = data;
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar.large(
-        leading: CircleAvatar(child: Icon(Icons.person)),
-        largeTitle: const Text("Progreso"),
+      navigationBar: const CupertinoNavigationBar(
+        middle: Text("Historial y Progreso"),
       ),
       child: SafeArea(
-        child: Material(
-          color: Colors.transparent,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: CupertinoSlidingSegmentedControl<int>(
-                    groupValue: _selectedSegment,
-                    children: const {
-                      0: Text("Historial"),
-                      1: Text("Récords (PR)"),
-                    },
-                    onValueChanged: (value) {
-                      setState(() {
-                        _selectedSegment = value!;
-                      });
-                    },
-                  ),
-                ),
+        child: _isLoading
+            ? const Center(child: CupertinoActivityIndicator())
+            : CustomScrollView(
+                slivers: [
+                  CupertinoSliverRefreshControl(onRefresh: _loadData),
+                  if (_history.isEmpty)
+                    const SliverFillRemaining(
+                      child: Center(
+                        child: Text(
+                          "No hay entrenamientos registrados",
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
+                      ),
+                    )
+                  else ...[
+                    if (_history.length >= 2)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            children: [
+                              const Text(
+                                "Volumen Total (kg)",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              SizedBox(height: 180, child: _buildChart()),
+                            ],
+                          ),
+                        ),
+                      ),
+                    SliverList(
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        final item = _history[index];
+                        final volumen = item['volumenTotal'];
+                        final fechaRaw = DateTime.parse(item['fecha']);
+                        final fecha = DateFormat(
+                          'dd MMM yyyy - HH:mm',
+                        ).format(fechaRaw);
+
+                        return Card(
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          child: ListTile(
+                            title: Text(
+                              item['rutinaNombre'] ?? 'Entrenamiento libre',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Text(fecha),
+                            trailing: Text(
+                              "${(volumen as num?)?.toStringAsFixed(1) ?? '0'} kg",
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Colors.indigo,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        );
+                      }, childCount: _history.length),
+                    ),
+                  ],
+                ],
               ),
-              Expanded(
-                flex: 1,
-                child: _selectedSegment == 0
-                    ? _buildHistoryList()
-                    : _buildPrList(),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
 
-  Widget _buildHistoryList() {
-    if (_history.isEmpty) {
-      return const Center(child: Text("No hay entrenamientos registrados"));
-    }
-    return ListView.builder(
-      itemCount: _history.length,
-      itemBuilder: (context, index) {
-        final item = _history[index];
-        final date = DateTime.parse(item['fecha']);
-        final formattedDate = "${date.day}/${date.month}/${date.year}";
-        final volumen = item['volumenTotal'] ?? 0;
+  Widget _buildChart() {
+    // Invertimos la lista para que la gráfica vaya de izquierda (antiguo) a derecha (nuevo)
+    final dataAscending = _history.reversed.toList();
 
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: ListTile(
-            leading: const Icon(Icons.history, color: Colors.blueGrey),
-            title: Text(item['rutinaNombre'] ?? "Entrenamiento libre"),
-            subtitle: Text(formattedDate),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                const Text("Volumen Total", style: TextStyle(fontSize: 10)),
-                Text(
-                  "${(volumen as num).toStringAsFixed(1)} kg",
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ],
+    final spots = List.generate(dataAscending.length, (index) {
+      final vol =
+          (dataAscending[index]['volumenTotal'] as num?)?.toDouble() ?? 0.0;
+      return FlSpot(index.toDouble(), vol);
+    });
+
+    return LineChart(
+      LineChartData(
+        gridData: const FlGridData(show: false),
+        titlesData: const FlTitlesData(
+          show: false,
+        ), // Ocultamos ejes para diseño limpio
+        borderData: FlBorderData(show: false),
+        lineBarsData: [
+          LineChartBarData(
+            spots: spots,
+            isCurved: true,
+            color: Colors.indigoAccent,
+            barWidth: 4,
+            isStrokeCapRound: true,
+            dotData: const FlDotData(show: true),
+            belowBarData: BarAreaData(
+              show: true,
+              color: Colors.indigoAccent.withOpacity(0.2),
             ),
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildPrList() {
-    if (_prs.isEmpty) {
-      return Center(
-        child: Text(
-          "Aún no tienes récords personales",
-          style: TextStyle(fontSize: 20),
-        ),
-      );
-    }
-    return ListView.builder(
-      itemCount: _prs.length,
-      itemBuilder: (context, index) {
-        final item = _prs[index];
-        final date = DateTime.parse(item['fecha']);
-        final formattedDate = "${date.day}/${date.month}/${date.year}";
-
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: ListTile(
-            leading: const Icon(Icons.emoji_events, color: Colors.amber),
-            title: Text(item['ejercicioNombre']),
-            subtitle: Text("Logrado el: $formattedDate"),
-            trailing: Text(
-              "${item['pesoMaximo']} kg\n(x${item['repeticiones']})",
-              textAlign: TextAlign.right,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-        );
-      },
+        ],
+      ),
     );
   }
 }

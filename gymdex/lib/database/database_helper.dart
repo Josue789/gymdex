@@ -18,7 +18,25 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(path, version: 1, onCreate: _createDB);
+    return await openDatabase(
+      path,
+      version: 2,
+      onCreate: _createDB,
+      onUpgrade: _upgradeDB,
+    );
+  }
+
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Agregar nuevas columnas a la tabla de ejercicios
+      await db.execute('ALTER TABLE ejercicios ADD COLUMN gifUrl TEXT;');
+      await db.execute('ALTER TABLE ejercicios ADD COLUMN target TEXT;');
+      await db.execute('ALTER TABLE ejercicios ADD COLUMN equipment TEXT;');
+      await db.execute('ALTER TABLE ejercicios ADD COLUMN instructions TEXT;');
+      await db.execute(
+        'ALTER TABLE ejercicios ADD COLUMN isTranslated INTEGER DEFAULT 0;',
+      );
+    }
   }
 
   Future _createDB(Database db, int version) async {
@@ -26,7 +44,12 @@ class DatabaseHelper {
     CREATE TABLE ejercicios(
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nombre TEXT,
-      grupo TEXT
+      grupo TEXT,
+      gifUrl TEXT,
+      target TEXT,
+      equipment TEXT,
+      instructions TEXT,
+      isTranslated INTEGER DEFAULT 0
     )
     ''');
 

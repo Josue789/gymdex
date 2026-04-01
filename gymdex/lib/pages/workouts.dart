@@ -32,9 +32,7 @@ class _WorkoutsState extends State<Workouts> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar.large(
-        leading: CircleAvatar(child: Icon(Icons.person)),
-      ),
+      navigationBar: CupertinoNavigationBar(middle: Text("Rutinas")),
       child: SafeArea(child: Content()),
     );
   }
@@ -55,7 +53,16 @@ class _WorkoutsState extends State<Workouts> {
         child: Icon(Icons.add),
       ),
       body: rutinas.isEmpty
-          ? Center(child: Text("No hay rutinas creadas"))
+          ? Center(
+              child: Text(
+                "No hay rutinas registradas",
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            )
           : ListView.builder(
               padding: EdgeInsets.all(10),
               itemCount: rutinas.length,
@@ -114,11 +121,14 @@ class _WorkoutsState extends State<Workouts> {
   Widget RoutineCard(Rutina rutina) {
     return Card(
       child: InkWell(
-        onTap: () {},
+        onTap: () {
+          verEjercicios(rutina);
+        },
         onLongPress: () {
           showCupertinoModalPopup(
             context: context,
             builder: (context) => CupertinoActionSheet(
+              title: Text("Opciones para ${rutina.nombre}"),
               actions: [
                 CupertinoActionSheetAction(
                   child: Text("Editar"),
@@ -163,47 +173,124 @@ class _WorkoutsState extends State<Workouts> {
             children: [
               Row(
                 spacing: 5,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    rutina.dia,
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.indigoAccent.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          rutina.dia,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.indigo,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 10),
+                      Text(
+                        rutina.nombre,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
-                  Text(
-                    rutina.nombre,
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  // Botón de opciones explícito
+                  IconButton(
+                    icon: Icon(Icons.more_vert),
+                    onPressed: () {
+                      showCupertinoModalPopup(
+                        context: context,
+                        builder: (context) => CupertinoActionSheet(
+                          title: Text("Opciones para ${rutina.nombre}"),
+                          actions: [
+                            CupertinoActionSheetAction(
+                              child: Text("Editar"),
+                              onPressed: () async {
+                                Navigator.pop(context);
+                                await showCupertinoDialog(
+                                  context: context,
+                                  builder: (ctx) => Newroutine(rutina: rutina),
+                                );
+                                getData();
+                              },
+                            ),
+                            CupertinoActionSheetAction(
+                              isDestructiveAction: true,
+                              child: Text("Eliminar"),
+                              onPressed: () async {
+                                Navigator.pop(context);
+                                await Ejercicioservice().deleteRoutine(
+                                  rutina.id,
+                                );
+                                getData();
+                              },
+                            ),
+                          ],
+                          cancelButton: CupertinoActionSheetAction(
+                            child: Text("Cancelar"),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
 
-              // Podrías agregar una descripción o conteo de ejercicios aquí si quisieras
-              // Text("Grupo muscular", ...),
-              Text(
-                "Toca para detalles",
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+              // Mostrar los grupos musuculares que se trabajan
+              FutureBuilder(
+                future: Ejercicioservice().getExercisesByRoutine(rutina.id),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    final exercises =
+                        snapshot.data as List<Map<String, dynamic>>;
+                    final groups = exercises
+                        .map((e) => (e['ejercicio'] as Ejercicio).grupo)
+                        .toSet()
+                        .join(", ");
+                    return Text(
+                      groups.isEmpty ? "Sin ejercicios" : groups,
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    );
+                  }
+                  return const Text(
+                    "Cargando...",
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  );
+                },
               ),
+              SizedBox(height: 10),
 
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 mainAxisSize: MainAxisSize.max,
                 children: [
-                  CupertinoButton.tinted(
-                    padding: EdgeInsets.symmetric(horizontal: 20),
-                    child: Text("Ver ejercicios"),
-                    onPressed: () => verEjercicios(rutina),
-                  ),
                   CupertinoButton.filled(
                     padding: EdgeInsets.symmetric(horizontal: 20),
+                    minSize: 40,
                     child: Row(
                       spacing: 2,
                       children: [Icon(Icons.play_arrow), Text("Entrenar")],
                     ),
-                    onPressed: () {
-                      showCupertinoDialog(
-                        context: context,
-                        builder: (BuildContext context) =>
-                            Traine(rutina: rutina),
+                    onPressed: () async {
+                      await Navigator.of(context, rootNavigator: true).push(
+                        CupertinoPageRoute(
+                          builder: (context) => Traine(rutina: rutina),
+                        ),
                       );
+                      getData();
                     },
                   ),
                 ],

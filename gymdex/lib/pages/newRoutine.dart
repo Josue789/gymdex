@@ -1,9 +1,11 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:gymdex/models/ejercicio.dart';
 import 'package:gymdex/models/gruposMusculares.dart';
 import 'package:gymdex/models/rutina.dart';
 import 'package:gymdex/service/ejercicioService.dart';
+import 'package:translator/translator.dart';
 
 class Newroutine extends StatefulWidget {
   final Rutina? rutina;
@@ -148,44 +150,113 @@ class _NewroutineState extends State<Newroutine> {
   void agregarEjercicio() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true, // Para ocupar más espacio en pantalla
       builder: (context) {
-        return ListView(
-          padding: const EdgeInsets.all(10),
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisSize: MainAxisSize.max,
-              children: [
-                Text(
-                  "Ejercicios disponibles",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                OutlinedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    crearEjercicio();
-                  },
-                  child: Text("Crear nuevo"),
-                ),
-              ],
-            ),
-            ...ejerciciosDisponibles.map((e) {
-              return ListTile(
-                title: Text(e.nombre),
-                onTap: () {
-                  setState(() {
-                    ejerciciosRutina.add({
-                      "ejercicio": e,
-                      "sets": "3",
-                      "reps": "10",
-                    });
-                  });
-                  Navigator.pop(context);
-                },
-              );
-            }).toList(),
-          ],
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            // Filtrar ejercicios según los grupos seleccionados
+            final filteredExercises = ejerciciosDisponibles.where((e) {
+              if (seleccionados.isEmpty) return true;
+              return seleccionados.contains(e.grupo);
+            }).toList();
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.85,
+              padding: EdgeInsets.only(
+                left: 10,
+                right: 10,
+                top: 10,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 10,
+              ),
+              child: Column(
+                children: [
+                  // Barra superior del modal
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          "Ejercicios ${seleccionados.isNotEmpty ? '(${seleccionados.join(", ")})' : ''}",
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            onPressed: () async {
+                              setModalState(() {}); // Mostrar loading si hiciera falta
+                              bool success = await Ejercicioservice()
+                                  .syncExercisesFromApi();
+                              if (success && mounted) {
+                                await cargarEjercicios();
+                                setModalState(() {});
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Catálogo sincronizado con Simply Fitness'),
+                                  ),
+                                );
+                              }
+                            },
+                            icon: const Icon(Icons.sync),
+                            tooltip: "Sincronizar Simply Fitness",
+                          ),
+                          OutlinedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              crearEjercicio();
+                            },
+                            child: const Text("Crear"),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: filteredExercises.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(20.0),
+                              child: Text(
+                                ejerciciosDisponibles.isEmpty
+                                    ? "No tienes ejercicios guardados localmente.\n\nPresiona el botón de sincronizar (🔄) arriba para cargar la lista de Simply Fitness."
+                                    : "No se encontraron ejercicios para los grupos seleccionados.",
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                    color: Colors.grey, fontSize: 16),
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: filteredExercises.length,
+                            itemBuilder: (context, index) {
+                              final e = filteredExercises[index];
+                              return TranslatedExerciseTile(
+                                ejercicio: e,
+                                onTap: () {
+                                  setState(() {
+                                    ejerciciosRutina.add({
+                                      "ejercicio": e,
+                                      "sets": "3",
+                                      "reps": "10",
+                                    });
+                                  });
+                                  Navigator.pop(context);
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
@@ -195,23 +266,27 @@ class _NewroutineState extends State<Newroutine> {
   Future<void> crearEjercicio() async {
     await showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       builder: (context) {
+        // Ahora usamos las categorías principales (keys) como los grupos para filtrar mejor
         final List<String> availableMuscles = seleccionados.isEmpty
-            ? gruposMusculares.values.expand((e) => e).toList()
-            : seleccionados
-                  .where((g) => gruposMusculares.containsKey(g))
-                  .expand((g) => gruposMusculares[g]!)
-                  .toList();
+            ? gruposMusculares.keys.toList()
+            : seleccionados.toList();
 
-        return Form(
-          key: _formKeyEjercicio,
-          child: ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              const Text(
-                "Crear nuevo ejercicio",
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.6,
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Form(
+            key: _formKeyEjercicio,
+            child: ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                const Text(
+                  "Crear nuevo ejercicio",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
               const SizedBox(height: 10),
               const Text("Nombre del ejercicio"),
               TextFormField(controller: nombreControllerEjercicio),
@@ -277,9 +352,10 @@ class _NewroutineState extends State<Newroutine> {
               ),
             ],
           ),
-        );
-      },
-    );
+        ),
+      );
+    },
+);
     if (mounted) agregarEjercicio();
   }
 
@@ -455,6 +531,102 @@ class _NewroutineState extends State<Newroutine> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class TranslatedExerciseTile extends StatefulWidget {
+  final Ejercicio ejercicio;
+  final VoidCallback onTap;
+
+  const TranslatedExerciseTile({
+    Key? key,
+    required this.ejercicio,
+    required this.onTap,
+  }) : super(key: key);
+
+  @override
+  State<TranslatedExerciseTile> createState() => _TranslatedExerciseTileState();
+}
+
+class _TranslatedExerciseTileState extends State<TranslatedExerciseTile> {
+  bool translating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkTranslation();
+  }
+
+  void _checkTranslation() async {
+    if (widget.ejercicio.isTranslated == 0 && widget.ejercicio.gifUrl != null) {
+      if (!mounted) return;
+      setState(() => translating = true);
+
+      try {
+        final translator = GoogleTranslator();
+        
+        final translatedName = await translator.translate(widget.ejercicio.nombre, to: 'es');
+        widget.ejercicio.nombre = translatedName.text;
+
+        if (widget.ejercicio.target != null) {
+          final translatedTarget = await translator.translate(widget.ejercicio.target!, to: 'es');
+          widget.ejercicio.target = translatedTarget.text;
+        }
+
+        if (widget.ejercicio.equipment != null) {
+          final translatedEq = await translator.translate(widget.ejercicio.equipment!, to: 'es');
+          widget.ejercicio.equipment = translatedEq.text;
+        }
+
+        widget.ejercicio.isTranslated = 1;
+        await Ejercicioservice().updateExerciseTranslation(widget.ejercicio);
+      } catch (e) {
+        print("Error translating: \$e");
+      }
+
+      if (mounted) {
+        setState(() => translating = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: widget.ejercicio.gifUrl != null
+          ? CachedNetworkImage(
+              imageUrl: widget.ejercicio.gifUrl!,
+              width: 50,
+              height: 50,
+              placeholder: (context, url) => const CupertinoActivityIndicator(),
+              errorWidget: (context, url, error) => const Icon(Icons.error),
+            )
+          : const Icon(Icons.fitness_center),
+      title: Text(
+        widget.ejercicio.nombre,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Row(
+        children: [
+          if (translating)
+            const Padding(
+              padding: EdgeInsets.only(right: 8.0),
+              child: SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
+          Expanded(
+            child: Text(
+              widget.ejercicio.target ?? widget.ejercicio.grupo,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2, // Permitir hasta 2 líneas para la activación
+            ),
+          ),
+        ],
+      ),
+      onTap: widget.onTap,
     );
   }
 }

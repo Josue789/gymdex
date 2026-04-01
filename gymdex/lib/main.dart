@@ -29,56 +29,84 @@ class MyApp extends StatelessWidget {
             colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigoAccent),
             brightness: Brightness.light,
           ),
-          home: CupertinoTabScaffold(
-            tabBar: CupertinoTabBar(
-              items: <BottomNavigationBarItem>[
-                BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.fitness_center),
-                  label: "Workouts",
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.history),
-                  label: "History",
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.settings),
-                  label: "Settings",
-                ),
-              ],
-            ),
-            tabBuilder: (BuildContext context, int index) {
+          home: const MainScreen(),
+        );
+      },
+    );
+  }
+}
+
+class MainScreen extends StatefulWidget {
+  const MainScreen({super.key});
+
+  @override
+  State<MainScreen> createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> {
+  final CupertinoTabController _controller = CupertinoTabController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  // Lógica para manejar el swipe
+  void _onHorizontalDragEnd(DragEndDetails details) {
+    if (details.primaryVelocity == null) return;
+
+    // Si la velocidad es negativa, el usuario deslizó hacia la IZQUIERDA (<-), quiere ir a la SIGUIENTE tab
+    if (details.primaryVelocity! < -200) {
+      if (_controller.index < 3) {
+        _controller.index += 1;
+      }
+    }
+    // Si la velocidad es positiva, el usuario deslizó hacia la DERECHA (->), quiere ir a la tab ANTERIOR
+    else if (details.primaryVelocity! > 200) {
+      if (_controller.index > 0) {
+        _controller.index -= 1;
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoTabScaffold(
+      controller: _controller,
+      tabBar: CupertinoTabBar(
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.fitness_center),
+            label: "Workouts",
+          ),
+          BottomNavigationBarItem(icon: Icon(Icons.history), label: "History"),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: "Settings",
+          ),
+        ],
+      ),
+      tabBuilder: (BuildContext context, int index) {
+        // Envolvemos el contenido en un GestureDetector para capturar el deslizamiento
+        return GestureDetector(
+          onHorizontalDragEnd: _onHorizontalDragEnd,
+          // HitTestBehavior.translucent asegura que detecte el gesto incluso en áreas vacías
+          behavior: HitTestBehavior.translucent,
+          child: CupertinoTabView(
+            builder: (BuildContext context) {
               switch (index) {
                 case 0:
-                  return CupertinoTabView(
-                    builder: (BuildContext context) {
-                      return Home();
-                    },
-                  );
+                  return const Home();
                 case 1:
-                  return CupertinoTabView(
-                    builder: (BuildContext context) {
-                      return Workouts();
-                    },
-                  );
+                  return const Workouts();
                 case 2:
-                  return CupertinoTabView(
-                    builder: (BuildContext context) {
-                      return History();
-                    },
-                  );
+                  return const History();
                 case 3:
-                  return CupertinoTabView(
-                    builder: (BuildContext context) {
-                      return Settings();
-                    },
-                  );
+                  return const Settings();
                 default:
-                  return CupertinoTabView(
-                    builder: (BuildContext context) {
-                      return Home();
-                    },
-                  );
+                  return const Home();
               }
             },
           ),

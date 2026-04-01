@@ -1,19 +1,8 @@
 final gruposMusculares = {
-  "Parte superior": [
-    "Pecho",
-    "Espalda",
-    "Hombros",
-    "Bíceps",
-    "Tríceps",
-    "Antebrazos",
-  ],
-  "Parte inferior": [
-    "Piernas",
-    "Cuádriceps",
-    "Isquiotibiales",
-    "Glúteos",
-    "Pantorrillas",
-  ],
-  "Core": ["Abdomen", "Core"],
-  "Otros": ["Cardio", "Cuerpo completo"],
+  "Pectorales": ["Pectoral mayor", "Pectoral superior", "Pecho"],
+  "Espalda": ["Dorsal ancho", "Redondo mayor", "Romboides", "Trapecio", "Erectores espinales"],
+  "Hombros": ["Deltoides anterior", "Deltoides medio", "Deltoides posterior", "Trapecio superior"],
+  "Piernas": ["Cuádriceps", "Isquiotibiales", "Glúteo mayor", "Glúteos"],
+  "Brazos y Core": ["Bíceps braquial", "Tríceps braquial", "Recto abdominal", "Flexores de cadera"],
 };
+

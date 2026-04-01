@@ -15,10 +15,7 @@ class _SettingsState extends State<Settings> {
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.systemGroupedBackground,
-      navigationBar: CupertinoNavigationBar.large(
-        leading: CircleAvatar(child: Icon(Icons.person)),
-        largeTitle: const Text("Configuración"),
-      ),
+      navigationBar: CupertinoNavigationBar(middle: Text("Configuraciones")),
       child: SafeArea(
         child: Material(
           color: Colors.transparent,
