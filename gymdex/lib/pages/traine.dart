@@ -30,6 +30,13 @@ class _TraineState extends State<Traine> {
       widget.rutina!.id,
     );
 
+    final personalRecords = await Ejercicioservice().getPersonalRecords();
+    final prMap = {
+      for (var record in personalRecords)
+        (record['ejercicioId'] as int):
+            (record['pesoMaximo'] as num?)?.toDouble() ?? 0.0,
+    };
+
     final ejerciciosConSets = data.map((ej) {
       final int setCount = int.tryParse(ej['sets'] ?? '3') ?? 3;
       final List<Map<String, dynamic>> setsData = List.generate(setCount, (
@@ -40,14 +47,17 @@ class _TraineState extends State<Traine> {
           'weight_controller': TextEditingController(),
           'reps_controller': TextEditingController(),
           'is_done': false,
+          'is_added': false,
         };
       });
 
+      final ejercicioObj = ej['ejercicio'] as Ejercicio;
       return {
-        'ejercicio': ej['ejercicio'],
+        'ejercicio': ejercicioObj,
         'target_sets': ej['sets'],
         'target_reps': ej['reps'],
         'sets_data': setsData,
+        'pr_weight': prMap[ejercicioObj.id] ?? 0.0,
         'is_complete': false,
       };
     }).toList();
@@ -68,73 +78,97 @@ class _TraineState extends State<Traine> {
     super.dispose();
   }
 
+  Color get _primaryColor => Colors.indigo.shade700;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Entrenamiento")),
+      appBar: AppBar(
+        title: Text(widget.rutina?.nombre ?? 'Entrenamiento'),
+        backgroundColor: _primaryColor,
+      ),
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 10),
-        child: FloatingActionButton(
-          backgroundColor: Colors.red,
+        child: FloatingActionButton.extended(
+          backgroundColor: Colors.red.shade700,
           foregroundColor: Colors.white,
           onPressed: _finishWorkout,
-          child: const Icon(Icons.stop_rounded),
+          icon: const Icon(Icons.stop_rounded),
+          label: const Text('Finalizar entrenamiento'),
         ),
       ),
       body: GestureDetector(
-        onTap: () =>
-            FocusScope.of(context).unfocus(), // Cierra teclado al tocar fuera
+        onTap: () => FocusScope.of(context).unfocus(),
         child: SafeArea(
           child: Column(
             children: [
-              Card(
-                margin: EdgeInsets.all(10),
-                child: Padding(
-                  padding: const EdgeInsets.all(15),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.max,
-                        children: [
-                          Text(
-                            "Progreso de rutina",
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          Chip(
-                            label: Text(
-                              "$terminado / ${ejercicios.length}",
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Card(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  elevation: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Progreso de rutina',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
-                            padding: EdgeInsets.all(0),
-                            backgroundColor: Colors.blueGrey.shade100,
+                              const SizedBox(height: 8),
+                              Text(
+                                '${terminado} / ${ejercicios.length} ejercicios completos',
+                                style: const TextStyle(color: Colors.grey),
+                              ),
+                              const SizedBox(height: 12),
+                              LinearProgressIndicator(
+                                minHeight: 10,
+                                value: ejercicios.isEmpty
+                                    ? 0
+                                    : terminado / ejercicios.length,
+                                color: Colors.lightBlueAccent,
+                                backgroundColor: Colors.grey.shade300,
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      SizedBox(height: 10),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: LinearProgressIndicator(
-                          minHeight: 10,
-                          value: ejercicios.isEmpty
-                              ? 0
-                              : terminado / ejercicios.length,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: _primaryColor.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Icon(
+                            Icons.fitness_center,
+                            color: Colors.indigo,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
               Expanded(
-                child: ListView(
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  children: ejercicios.map((e) {
-                    return cardEjercicios(e);
-                  }).toList(),
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  itemCount: ejercicios.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    return _buildExerciseCard(ejercicios[index]);
+                  },
                 ),
               ),
             ],
@@ -144,84 +178,103 @@ class _TraineState extends State<Traine> {
     );
   }
 
-  Widget cardEjercicios(Map<String, dynamic> ejercicio) {
+  Widget _buildExerciseCard(Map<String, dynamic> ejercicio) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final bool isComplete = ejercicio['is_complete'] ?? false;
+    final ejercicioObj = ejercicio['ejercicio'] as Ejercicio;
+    final hasImage =
+        ejercicioObj.gifUrl != null && ejercicioObj.gifUrl!.isNotEmpty;
+
     return Card(
-      color: isComplete ? Colors.green.shade100 : null,
-      elevation: 2,
-      clipBehavior: Clip.antiAlias, // Mejora bordes visuales
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8.0),
-        child: ExpansionTile(
-          title: Text(
-            ejercicio['ejercicio'].nombre,
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-          ),
-          subtitle: Text(
-            '${ejercicio['target_sets']} X ${ejercicio['target_reps']}',
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
-          ),
-          trailing: isComplete
-              ? Icon(Icons.check_circle, color: Colors.green)
-              : Icon(Icons.keyboard_arrow_down),
-          children: <Widget>[
-            if (ejercicio['ejercicio'].gifUrl != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: CachedNetworkImage(
-                    imageUrl: ejercicio['ejercicio'].gifUrl!,
-                    height: 150,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) =>
-                        const CupertinoActivityIndicator(),
-                    errorWidget: (context, url, error) =>
-                        const Icon(Icons.error),
-                  ),
-                ),
-              ),
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 8.0,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text("SET", style: TextStyle(fontWeight: FontWeight.bold)),
-                  Text(
-                    "PESO (kg)",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  Text("REPS", style: TextStyle(fontWeight: FontWeight.bold)),
-                  Icon(Icons.check, color: Colors.transparent), // Placeholder
-                ],
-              ),
-            ),
-            ...(ejercicio['sets_data'] as List<Map<String, dynamic>>).map((
-              set,
-            ) {
-              return _buildSetRow(set, ejercicio);
-            }).toList(),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 8.0,
-              ),
-              child: OutlinedButton.icon(
-                onPressed: () => _addSet(ejercicio),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text("Agregar Set"),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(36),
-                ),
-              ),
-            ),
-          ],
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      elevation: 1,
+      color: isComplete
+          ? (isDark
+                ? Colors.green.shade900.withValues(alpha: 0.4)
+                : Colors.green.shade50)
+          : (isDark ? Colors.grey[900] : Colors.white),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        collapsedIconColor: Colors.indigo,
+        iconColor: Colors.indigo,
+        title: Text(
+          ejercicioObj.nombre,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
+        subtitle: Text(
+          '${ejercicio['target_sets']} x ${ejercicio['target_reps']}',
+          style: const TextStyle(color: Colors.grey),
+        ),
+        children: [
+          if (hasImage)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: CachedNetworkImage(
+                  imageUrl: ejercicioObj.gifUrl!,
+                  height: 140,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => const SizedBox(
+                    height: 140,
+                    child: Center(child: CupertinoActivityIndicator()),
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    height: 140,
+                    color: Colors.grey.shade200,
+                    child: const Center(child: Icon(Icons.error_outline)),
+                  ),
+                ),
+              ),
+            ),
+          if (hasImage) const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildSmallPill(
+                  'PR',
+                  ejercicio['pr_weight'] > 0
+                      ? '${ejercicio['pr_weight']} kg'
+                      : 'Sin PR',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...((ejercicio['sets_data'] as List<Map<String, dynamic>>).map(
+            (set) => _buildSetRow(set, ejercicio),
+          )),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: OutlinedButton.icon(
+              onPressed: () => _addSet(ejercicio),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Agregar set'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSmallPill(String label, String value) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey[800] : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          const SizedBox(height: 4),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+        ],
       ),
     );
   }
@@ -230,63 +283,96 @@ class _TraineState extends State<Traine> {
     Map<String, dynamic> setData,
     Map<String, dynamic> ejercicioData,
   ) {
-    bool isDone = setData['is_done'] ?? false;
+    final bool isDone = setData['is_done'] ?? false;
+    final bool isAdded = setData['is_added'] ?? false;
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            setData['set_number'].toString(),
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
           SizedBox(
-            width: 80,
+            width: 30,
+            child: Text(
+              setData['set_number'].toString(),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
             child: TextFormField(
               controller: setData['weight_controller'],
               keyboardType: TextInputType.numberWithOptions(decimal: true),
               textInputAction: TextInputAction.next,
               textAlign: TextAlign.center,
+              enabled: !isDone,
               decoration: InputDecoration(
-                hintText: "0.0",
-                contentPadding: EdgeInsets.symmetric(
-                  vertical: 10,
-                  horizontal: 5,
+                hintText: 'kg',
+                filled: isDone,
+                fillColor: isDone
+                    ? (isDark ? Colors.grey[800] : Colors.grey.shade100)
+                    : null,
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 10,
                 ),
-                border: OutlineInputBorder(),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
             ),
           ),
-          SizedBox(
-            width: 80,
+          const SizedBox(width: 8),
+          Expanded(
             child: TextFormField(
               controller: setData['reps_controller'],
-              keyboardType: TextInputType.numberWithOptions(decimal: false),
+              keyboardType: TextInputType.number,
               textInputAction: TextInputAction.done,
               textAlign: TextAlign.center,
+              enabled: !isDone,
               decoration: InputDecoration(
-                hintText: "0",
-                contentPadding: EdgeInsets.symmetric(
-                  vertical: 10,
-                  horizontal: 5,
+                hintText: 'reps',
+                filled: isDone,
+                fillColor: isDone
+                    ? (isDark ? Colors.grey[800] : Colors.grey.shade100)
+                    : null,
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 10,
                 ),
-                border: OutlineInputBorder(),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
             ),
           ),
-          IconButton(
-            icon: Icon(
-              isDone ? Icons.check_box : Icons.check_box_outline_blank,
-              color: isDone ? Colors.green : Colors.grey,
-            ),
-            onPressed: () {
+          const SizedBox(width: 8),
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () {
               setState(() {
                 setData['is_done'] = !isDone;
-                _updateProgress();
               });
+              _updateProgress();
             },
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isDone ? Colors.green.shade100 : null,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                isDone ? Icons.check_box : Icons.check_box_outline_blank,
+                color: isDone ? Colors.green : Colors.grey.shade700,
+              ),
+            ),
           ),
+          if (isAdded)
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              color: Colors.red.shade400,
+              onPressed: () => _removeSet(ejercicioData, setData),
+            ),
         ],
       ),
     );
@@ -301,7 +387,22 @@ class _TraineState extends State<Traine> {
         'weight_controller': TextEditingController(),
         'reps_controller': TextEditingController(),
         'is_done': false,
+        'is_added': true,
       });
+    });
+  }
+
+  void _removeSet(
+    Map<String, dynamic> ejercicio,
+    Map<String, dynamic> setData,
+  ) {
+    setState(() {
+      final sets = ejercicio['sets_data'] as List<Map<String, dynamic>>;
+      sets.remove(setData);
+      for (var i = 0; i < sets.length; i++) {
+        sets[i]['set_number'] = i + 1;
+      }
+      _updateProgress();
     });
   }
 
@@ -320,26 +421,24 @@ class _TraineState extends State<Traine> {
     }
     setState(() {
       terminado = completedExercises;
-      if (completedExercises == ejercicios.length) {
+      if (completedExercises == ejercicios.length && ejercicios.isNotEmpty) {
         showCupertinoDialog(
           context: context,
           builder: (BuildContext context) => CupertinoAlertDialog(
-            title: Text("Rutina termina"),
+            title: const Text("Rutina terminada"),
             content: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
-              children: [
-                // Lottie
-                Text("Buen trabajo!", style: TextStyle(fontSize: 20)),
+              children: const [
+                SizedBox(height: 10),
+                Text("¡Buen trabajo! Has completado todos los ejercicios."),
               ],
             ),
             actions: [
               CupertinoDialogAction(
-                child: Text("Ok"),
+                child: const Text("Ok"),
                 onPressed: () {
-                  Navigator.pop(context); // Cierra el diálogo
-                  _finishWorkout(); // Guarda y sale de la pantalla
+                  Navigator.pop(context);
+                  _finishWorkout();
                 },
               ),
             ],
@@ -350,24 +449,20 @@ class _TraineState extends State<Traine> {
   }
 
   void _finishWorkout() async {
-    // Guardamos el entrenamiento
-    int trainingId = await Ejercicioservice().saveTraining(widget.rutina?.id);
+    final trainingId = await Ejercicioservice().saveTraining(widget.rutina?.id);
 
     if (trainingId != -1) {
-      // Recorremos los ejercicios y sus sets
       for (var ej in ejercicios) {
         final ejercicioObj = ej['ejercicio'] as Ejercicio;
         final sets = ej['sets_data'] as List<Map<String, dynamic>>;
 
         for (var set in sets) {
-          // Guardar solo si está marcado como completado
           if (set['is_done'] == true) {
-            double weight =
+            final weight =
                 double.tryParse(set['weight_controller'].text) ?? 0.0;
-            int reps = int.tryParse(set['reps_controller'].text) ?? 0;
-            int setNum = set['set_number'];
+            final reps = int.tryParse(set['reps_controller'].text) ?? 0;
+            final setNum = set['set_number'];
 
-            // Guardar el set en la BD
             await Ejercicioservice().saveSet(
               trainingId,
               ejercicioObj.id,
@@ -376,7 +471,6 @@ class _TraineState extends State<Traine> {
               weight,
             );
 
-            // Verificar si es PR
             await Ejercicioservice().checkAndUpdatePR(
               ejercicioObj.id,
               weight,
@@ -386,6 +480,7 @@ class _TraineState extends State<Traine> {
         }
       }
     }
+
     if (mounted) Navigator.pop(context);
   }
 }

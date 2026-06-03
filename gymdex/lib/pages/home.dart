@@ -17,6 +17,8 @@ class _HomeState extends State<Home> {
   Rutina? _todaysRoutine;
   bool _isLoading = true;
   int _workoutsThisWeek = 0;
+  double _weeklyVolume = 0;
+  int _estimatedCalories = 0;
   List<Map<String, dynamic>> _recentPRs = [];
   Map<String, dynamic> weatherData = {};
   bool _isWeatherLoading = true;
@@ -48,27 +50,30 @@ class _HomeState extends State<Home> {
     final today = _getCurrentDayInSpanish();
     final service = Ejercicioservice();
 
-    // 1. Obtener rutina de hoy
     final routine = await service.getRoutineByDay(today);
-
-    // 2. Calcular entrenamientos de esta semana
     final history = await service.getTrainingHistory();
     final now = DateTime.now();
-    // Obtener el lunes de la semana actual
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-    // Filtrar historial
-    final weeklyCount = history.where((h) {
-      final date = DateTime.parse(h['fecha']);
-      return date.isAfter(startOfWeek.subtract(Duration(seconds: 1)));
-    }).length;
+    final weeklyHistory = history.where((h) {
+      final date = DateTime.tryParse(h['fecha']);
+      return date != null &&
+          date.isAfter(startOfWeek.subtract(Duration(seconds: 1)));
+    }).toList();
 
-    // 3. Obtener algunos PRs (tomamos los primeros 3 para mostrar)
+    final weeklyCount = weeklyHistory.length;
+    final weeklyVolume = weeklyHistory.fold(0.0, (double sum, item) {
+      return sum + ((item['volumenTotal'] as num?)?.toDouble() ?? 0.0);
+    });
+    final calories = (weeklyVolume * 0.18).round();
+
     final prs = await service.getPersonalRecords();
 
     if (mounted) {
       setState(() {
         _todaysRoutine = routine;
         _workoutsThisWeek = weeklyCount;
+        _weeklyVolume = weeklyVolume;
+        _estimatedCalories = calories;
         _recentPRs = prs.take(3).toList();
         _isLoading = false;
       });
@@ -78,16 +83,13 @@ class _HomeState extends State<Home> {
   // Iniciar entrenamiento
   void _startTraining() async {
     if (_todaysRoutine != null) {
-      // Navegar a la pantalla de entrenamiento
       await Navigator.of(context, rootNavigator: true).push(
         CupertinoPageRoute(
           builder: (context) => Traine(rutina: _todaysRoutine),
         ),
       );
-      // Recargar datos al volver
       _loadDashboardData();
     } else {
-      // Mostrar un diálogo si no hay rutina
       showCupertinoDialog(
         context: context,
         builder: (ctx) => CupertinoAlertDialog(
@@ -117,142 +119,84 @@ class _HomeState extends State<Home> {
 
   // Cargar clima
   void _loadWeather() async {
-    final data = await Cloudservice().getWeather(_city);
+    final data = await CloudService().getWeather(_city);
+    debugPrint("Clima para $_city: $data");
     if (mounted) {
       setState(() {
-        // Si data es null, asignamos un mapa vacío
         weatherData = data ?? {};
         _isWeatherLoading = false;
       });
     }
   }
 
-  // Mapeo de descripción a Icono
-  IconData _getWeatherIcon(String? description) {
-    if (description == null) return Icons.help_outline;
-    if (description.contains("Sunny") || description.contains("Clear"))
-      return Icons.wb_sunny;
-    if (description.contains("Partly")) return Icons.wb_cloudy;
-    if (description.contains("Cloudy") || description.contains("Mist"))
-      return Icons.cloud;
-    if (description.contains("Rain") || description.contains("Shower"))
-      return Icons.grain;
-    if (description.contains("Snow")) return Icons.ac_unit;
-    if (description.contains("Thunder")) return Icons.flash_on;
-    return Icons.cloud; // Default
+  IconData _getWeatherIcon(int? code) {
+    if (code == null) return Icons.help_outline;
+    if (code == 0) return Icons.wb_sunny; // Despejado
+    if (code >= 1 && code <= 3) return Icons.wb_cloudy; // Nublado parcial
+    if (code >= 45 && code <= 48) return Icons.cloud; // Niebla
+    if (code >= 51 && code <= 67) return Icons.grain; // Lluvia/Llovizna
+    if (code >= 71 && code <= 77) return Icons.ac_unit; // Nieve
+    if (code >= 80 && code <= 82) return Icons.beach_access; // Chubascos
+    if (code >= 95) return Icons.flash_on; // Tormenta
+    return Icons.cloud;
   }
 
-  // Mapeo de descripción a Color
-  Color _getWeatherColor(String? description) {
-    if (description == null) return Colors.grey;
-    if (description.contains("Sunny") || description.contains("Clear"))
-      return Colors.orange;
-    if (description.contains("Partly")) return Colors.orangeAccent;
-    if (description.contains("Cloudy") || description.contains("Mist"))
-      return Colors.blueGrey;
-    if (description.contains("Rain") || description.contains("Shower"))
-      return Colors.blue;
-    if (description.contains("Snow")) return Colors.lightBlue;
-    if (description.contains("Thunder")) return Colors.deepPurple;
+  Color _getWeatherColor(int? code) {
+    if (code == null) return Colors.grey;
+    if (code == 0) return Colors.orange;
+    if (code >= 1 && code <= 3) return Colors.orangeAccent;
+    if (code >= 45 && code <= 48) return Colors.blueGrey;
+    if (code >= 51 && code <= 67) return Colors.blue;
+    if (code >= 71 && code <= 77) return Colors.lightBlue;
+    if (code >= 80 && code <= 82) return Colors.blueAccent;
+    if (code >= 95) return Colors.deepPurple;
     return Colors.blueAccent;
   }
 
-  String _translateWeather(String? description) {
-    if (description == null) return "";
-    const translations = {
-      'Sunny': 'soleado',
-      'Partly cloudy': 'parcialmente nublado',
-      'Cloudy': 'nublado',
-      'Rain': 'lluvioso',
-      'Clear': 'despejado',
-      'Snow': 'nevado',
-      'Thunderstorm': 'tormenta',
-      'Light rain': 'lluvia ligera',
-      'Mist': 'neblina',
-    };
-    return translations[description] ?? description;
+  String _translateWeather(int? code) {
+    if (code == null) return "desconocido";
+    if (code == 0) return "despejado";
+    if (code >= 1 && code <= 3) return "nublado";
+    if (code >= 45 && code <= 48) return "con niebla";
+    if (code >= 51 && code <= 55) return "con llovizna";
+    if (code >= 61 && code <= 67) return "lluvioso";
+    if (code >= 71 && code <= 77) return "nevado";
+    if (code >= 80 && code <= 82) return "con chubascos";
+    if (code >= 95) return "con tormenta";
+    return "nublado";
   }
 
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(middle: Text("GymDex")),
+      navigationBar: const CupertinoNavigationBar(middle: Text("Dashboard")),
       child: SafeArea(
-        minimum: EdgeInsets.all(10),
+        minimum: const EdgeInsets.all(12),
         child: Material(
           color: Colors.transparent,
           child: ListView(
             children: [
-              _isWeatherLoading ? _buildSkeletonWeather() : _buildWeatherCard(),
-
-              // Dashboard Principal (Rutina de hoy)
-              _isLoading ? _buildSkeletonDashboard() : _buildTodayCard(),
-
-              SizedBox(height: 20),
-
-              // Títulos y secciones inferiores (Solo visible cuando carga el dashboard)
+              _buildHeaderCard(),
+              const SizedBox(height: 16),
+              if (_isLoading) _buildSkeletonDashboard() else _buildKpiRow(),
+              const SizedBox(height: 16),
+              if (_isLoading) _buildSkeletonDashboard() else _buildTodayCard(),
+              const SizedBox(height: 20),
+              if (!_isLoading && _recentPRs.isNotEmpty) ...[
+                _buildSectionTitle("Tus mejores marcas"),
+                _buildPRList(),
+              ],
               if (!_isLoading) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 5),
-                  child: Text(
-                    "Tu semana",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                SizedBox(height: 10),
-                // Tarjeta de Resumen Semanal
-                Card(
-                  elevation: 2,
-                  child: Padding(
-                    padding: EdgeInsets.all(15),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.orangeAccent.withOpacity(0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.calendar_today,
-                            color: Colors.orange,
-                          ),
-                        ),
-                        SizedBox(width: 15),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              "Entrenamientos",
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                            Text(
-                              "$_workoutsThisWeek completados",
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                SizedBox(height: 20),
-                if (_recentPRs.isNotEmpty) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 5),
-                    child: Text(
-                      "Tus mejores marcas (PRs)",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  _buildPRList(),
-                ],
+                const SizedBox(height: 20),
+                _buildSectionTitle("Resumen semanal"),
+                _buildWeeklySummaryCard(),
+              ],
+              if (!_isLoading &&
+                  !_isWeatherLoading &&
+                  weatherData.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                _buildSectionTitle("Clima para hoy"),
+                _buildWeatherCard(),
               ],
             ],
           ),
@@ -261,34 +205,175 @@ class _HomeState extends State<Home> {
     );
   }
 
-  // Tarjeta de "Rutina de Hoy" con datos cargados
-  Widget _buildTodayCard() {
-    return Card.filled(
-      child: Padding(
-        padding: const EdgeInsets.all(15.0),
+  Widget _buildHeaderCard() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1F3B70), Color(0xFF17294F)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Hola, Guerrero",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            "Listo para tu sesión? Tu próxima rutina está lista.",
+            style: TextStyle(color: Colors.white70, fontSize: 14),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildMetricTile(
+                "Clima hoy",
+                _isWeatherLoading
+                    ? "Cargando..."
+                    : "${weatherData['current']?['temperature_2m'] ?? '--'}°C",
+                Colors.orangeAccent,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricTile(String label, String value, Color color) {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(16),
+        ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "¿Listo para sudar?",
+              label,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildKpiRow() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildSummaryCard(
+            Icons.fitness_center,
+            "Entrenamientos",
+            "$_workoutsThisWeek",
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildSummaryCard(
+            Icons.bar_chart,
+            "Volumen",
+            "${_weeklyVolume.round()} kg",
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSummaryCard(IconData icon, String title, String value) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: Colors.indigoAccent, size: 28),
+            const SizedBox(height: 12),
+            Text(title, style: const TextStyle(color: Colors.grey)),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeletonDashboard() {
+    return Column(
+      children: List.generate(
+        2,
+        (index) => Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          height: 80,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade200,
+            borderRadius: BorderRadius.circular(18),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTodayCard() {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(18.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Listo para sudar?",
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 5),
+            const SizedBox(height: 8),
             Text(
               _todaysRoutine != null
                   ? "Hoy toca: ${_todaysRoutine!.nombre}"
                   : "Hoy es día de descanso o sin asignar.",
+              style: TextStyle(
+                fontSize: 16,
+                color: isDark ? Colors.white70 : Colors.grey,
+              ),
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 20),
             CupertinoButton.filled(
               onPressed: _startTraining,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
-                children: [
+                children: const [
                   Icon(Icons.play_arrow),
                   SizedBox(width: 8),
-                  Text("Comenzar entrenamiento"),
+                  Text("Comenzar Entreno"),
                 ],
               ),
             ),
@@ -298,41 +383,94 @@ class _HomeState extends State<Home> {
     );
   }
 
-  // SKELETON: Dashboard principal
-  Widget _buildSkeletonDashboard() {
-    return Card.filled(
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Text(
+        title,
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  Widget _buildWeeklySummaryCard() {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(15.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Título simulado
-            Container(
-              width: 150,
-              height: 24,
-              decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(5),
-              ),
+            Row(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  padding: const EdgeInsets.all(14),
+                  child: const Icon(Icons.show_chart, color: Colors.blue),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Carga Total",
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "${_weeklyVolume.round()} kg",
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Text(
+                      "Calorías",
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "$_estimatedCalories kcal",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            SizedBox(height: 10),
-            // Texto cuerpo simulado
-            Container(
-              width: double.infinity,
-              height: 16,
-              decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(5),
-              ),
+            const SizedBox(height: 16),
+            LinearProgressIndicator(
+              value: _workoutsThisWeek > 0
+                  ? (_workoutsThisWeek / 5).clamp(0.0, 1.0)
+                  : 0,
+              minHeight: 8,
+              color: Colors.lightBlueAccent,
+              backgroundColor: Colors.blueGrey.shade50,
             ),
-            SizedBox(height: 20),
-            // Botón simulado
-            Container(
-              width: double.infinity,
-              height: 45,
-              decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(10),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                _workoutsThisWeek >= 5
+                    ? 'Meta semanal alcanzada'
+                    : '$_workoutsThisWeek / 5 entrenos',
+                style: TextStyle(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white70
+                      : Colors.black54,
+                ),
               ),
             ),
           ],
@@ -341,29 +479,38 @@ class _HomeState extends State<Home> {
     );
   }
 
-  // SKELETON: Clima
   Widget _buildSkeletonWeather() {
     return Card(
       elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: Padding(
-        padding: EdgeInsets.all(15),
+        padding: const EdgeInsets.all(15),
         child: Row(
           children: [
-            CircleAvatar(backgroundColor: Colors.grey.withOpacity(0.3)),
-            SizedBox(width: 15),
+            CircleAvatar(
+              backgroundColor: Colors.grey.withOpacity(0.3),
+              radius: 20,
+            ),
+            const SizedBox(width: 15),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
                   width: 120,
                   height: 14,
-                  color: Colors.grey.withOpacity(0.3),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(5),
+                  ),
                 ),
-                SizedBox(height: 5),
+                const SizedBox(height: 5),
                 Container(
                   width: 80,
                   height: 14,
-                  color: Colors.grey.withOpacity(0.3),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(5),
+                  ),
                 ),
               ],
             ),
@@ -374,55 +521,64 @@ class _HomeState extends State<Home> {
   }
 
   Widget _buildWeatherCard() {
-    if (weatherData.isEmpty)
-      return SizedBox.shrink(); // Si falló la carga, no mostrar nada
+    if (weatherData.isEmpty) return const SizedBox.shrink();
 
-    final description = weatherData['description'];
-    final icon = _getWeatherIcon(description);
-    final color = _getWeatherColor(description);
+    final int? code = weatherData['current']?['weather_code'];
+    final icon = _getWeatherIcon(code);
+    final color = _getWeatherColor(code);
 
     return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       elevation: 2,
       child: Padding(
-        padding: EdgeInsets.all(15),
+        padding: const EdgeInsets.all(15),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Container(
-              padding: EdgeInsets.all(10),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: color.withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color),
             ),
-            SizedBox(width: 10),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'hoy será un día ${_translateWeather(description)}',
-                    style: TextStyle(color: Colors.grey),
-                    overflow: TextOverflow.ellipsis,
+                    'hoy será un día ${_translateWeather(code)}',
+                    style: TextStyle(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : Colors.black87,
+                    ),
                   ),
-                  Text('Temperatura: ${weatherData['temperature']}'),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Temperatura: ${weatherData['current']?['temperature_2m']}°C',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ],
               ),
             ),
-            IconButton(
+            CupertinoButton(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+              color: Colors.grey.shade200,
+              child: const Icon(Icons.edit, color: Colors.black54),
               onPressed: () {
                 final textController = TextEditingController(text: _city);
                 showCupertinoDialog(
                   context: context,
                   builder: (ctx) => CupertinoAlertDialog(
-                    title: Text("Configuracion de clima"),
+                    title: const Text("Configuración de clima"),
                     content: Padding(
                       padding: const EdgeInsets.only(top: 15),
                       child: Row(
                         children: [
-                          Icon(Icons.cloud, color: Colors.blue),
-                          SizedBox(width: 10),
+                          const Icon(Icons.cloud, color: Colors.blue),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: CupertinoTextField(
                               controller: textController,
@@ -434,13 +590,11 @@ class _HomeState extends State<Home> {
                     ),
                     actions: [
                       CupertinoDialogAction(
-                        child: Text("Cancelar"),
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                        },
+                        child: const Text("Cancelar"),
+                        onPressed: () => Navigator.pop(ctx),
                       ),
                       CupertinoDialogAction(
-                        child: Text("Guardar"),
+                        child: const Text("Guardar"),
                         onPressed: () async {
                           if (textController.text.isNotEmpty) {
                             final prefs = await SharedPreferences.getInstance();
@@ -463,7 +617,6 @@ class _HomeState extends State<Home> {
                   ),
                 );
               },
-              icon: Icon(Icons.edit),
             ),
           ],
         ),
@@ -475,22 +628,37 @@ class _HomeState extends State<Home> {
     return Column(
       children: _recentPRs.map((pr) {
         return Card(
-          margin: EdgeInsets.only(top: 8),
+          margin: const EdgeInsets.only(top: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          elevation: 1,
           child: ListTile(
-            leading: Icon(Icons.emoji_events, color: Colors.amber),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
+            leading: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.emoji_events, color: Colors.amber),
+            ),
             title: Text(
               pr['ejercicioNombre'] ?? 'Ejercicio',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
+            subtitle: Text("${pr['repeticiones']} reps"),
             trailing: Text(
               "${pr['pesoMaximo']} kg",
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: Colors.indigo,
               ),
             ),
-            subtitle: Text("${pr['repeticiones']} reps"),
           ),
         );
       }).toList(),

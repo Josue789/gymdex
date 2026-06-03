@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:gymdex/pages/history.dart';
 import 'package:gymdex/pages/home.dart';
 import 'package:gymdex/pages/settings.dart';
@@ -72,46 +73,65 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoTabScaffold(
-      controller: _controller,
-      tabBar: CupertinoTabBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.fitness_center),
-            label: "Workouts",
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: (isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark)
+          .copyWith(
+            statusBarColor:
+                Colors.transparent, // Hace la barra transparente en Android
           ),
-          BottomNavigationBarItem(icon: Icon(Icons.history), label: "History"),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: "Settings",
-          ),
-        ],
+      child: CupertinoTabScaffold(
+        controller: _controller,
+        tabBar: CupertinoTabBar(
+          backgroundColor: isDark
+              ? Colors.grey[900] ?? Colors.black
+              : null, // Deja el fondo transparente en modo claro para que se vea el efecto de blur
+          activeColor: isDark ? Colors.blueAccent : Colors.lightBlueAccent,
+          inactiveColor: isDark
+              ? Colors.white
+              : Colors.grey[400] ?? Colors.grey,
+          items: const <BottomNavigationBarItem>[
+            BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.fitness_center),
+              label: "Workouts",
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.history),
+              label: "History",
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.settings),
+              label: "Settings",
+            ),
+          ],
+        ),
+        tabBuilder: (BuildContext context, int index) {
+          // Envolvemos el contenido en un GestureDetector para capturar el deslizamiento
+          return GestureDetector(
+            onHorizontalDragEnd: _onHorizontalDragEnd,
+            // HitTestBehavior.translucent asegura que detecte el gesto incluso en áreas vacías
+            behavior: HitTestBehavior.translucent,
+            child: CupertinoTabView(
+              builder: (BuildContext context) {
+                switch (index) {
+                  case 0:
+                    return const Home();
+                  case 1:
+                    return const Workouts();
+                  case 2:
+                    return const History();
+                  case 3:
+                    return const Settings();
+                  default:
+                    return const Home();
+                }
+              },
+            ),
+          );
+        },
       ),
-      tabBuilder: (BuildContext context, int index) {
-        // Envolvemos el contenido en un GestureDetector para capturar el deslizamiento
-        return GestureDetector(
-          onHorizontalDragEnd: _onHorizontalDragEnd,
-          // HitTestBehavior.translucent asegura que detecte el gesto incluso en áreas vacías
-          behavior: HitTestBehavior.translucent,
-          child: CupertinoTabView(
-            builder: (BuildContext context) {
-              switch (index) {
-                case 0:
-                  return const Home();
-                case 1:
-                  return const Workouts();
-                case 2:
-                  return const History();
-                case 3:
-                  return const Settings();
-                default:
-                  return const Home();
-              }
-            },
-          ),
-        );
-      },
     );
   }
 }

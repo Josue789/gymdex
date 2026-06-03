@@ -85,54 +85,134 @@ class Ejercicioservice {
           {
             "grupo_muscular": "Pectorales",
             "ejercicios": [
-              {"nombre": "Press de banca con barra", "activacion_principal": "Pectoral mayor, tríceps, deltoides anterior"},
-              {"nombre": "Press banca inclinado con mancuernas", "activacion_principal": "Pectoral superior, deltoides anterior"},
-              {"nombre": "Cruce de poleas", "activacion_principal": "Pectoral mayor (enfoque en fibras internas)"},
-              {"nombre": "Aperturas con mancuernas", "activacion_principal": "Pectoral mayor"},
-              {"nombre": "Flexiones", "activacion_principal": "Pectoral, tríceps, core"}
-            ]
+              {
+                "nombre": "Press de banca con barra",
+                "activacion_principal":
+                    "Pectoral mayor, tríceps, deltoides anterior",
+              },
+              {
+                "nombre": "Press banca inclinado con mancuernas",
+                "activacion_principal": "Pectoral superior, deltoides anterior",
+              },
+              {
+                "nombre": "Cruce de poleas",
+                "activacion_principal":
+                    "Pectoral mayor (enfoque en fibras internas)",
+              },
+              {
+                "nombre": "Aperturas con mancuernas",
+                "activacion_principal": "Pectoral mayor",
+              },
+              {
+                "nombre": "Flexiones",
+                "activacion_principal": "Pectoral, tríceps, core",
+              },
+            ],
           },
           {
             "grupo_muscular": "Espalda",
             "ejercicios": [
-              {"nombre": "Jalón al pecho con agarre ancho", "activacion_principal": "Dorsal ancho, redondo mayor"},
-              {"nombre": "Remo con mancuerna a una mano", "activacion_principal": "Dorsal ancho, romboides, trapecio"},
-              {"nombre": "Remo con barra", "activacion_principal": "Espalda media, dorsal ancho, erectores espinales"},
-              {"nombre": "Peso muerto con barra", "activacion_principal": "Cadena posterior, erectores espinales, dorsales"},
-              {"nombre": "Jalón dorsal con brazos rectos", "activacion_principal": "Dorsal ancho (aislamiento)"}
-            ]
+              {
+                "nombre": "Jalón al pecho con agarre ancho",
+                "activacion_principal": "Dorsal ancho, redondo mayor",
+              },
+              {
+                "nombre": "Remo con mancuerna a una mano",
+                "activacion_principal": "Dorsal ancho, romboides, trapecio",
+              },
+              {
+                "nombre": "Remo con barra",
+                "activacion_principal":
+                    "Espalda media, dorsal ancho, erectores espinales",
+              },
+              {
+                "nombre": "Peso muerto con barra",
+                "activacion_principal":
+                    "Cadena posterior, erectores espinales, dorsales",
+              },
+              {
+                "nombre": "Jalón dorsal con brazos rectos",
+                "activacion_principal": "Dorsal ancho (aislamiento)",
+              },
+            ],
           },
           {
             "grupo_muscular": "Hombros",
             "ejercicios": [
-              {"nombre": "Press Militar (barra o mancuernas)", "activacion_principal": "Deltoides anterior y medio"},
-              {"nombre": "Elevación lateral con mancuernas", "activacion_principal": "Deltoides medio"},
-              {"nombre": "Elevación frontal con mancuernas", "activacion_principal": "Deltoides anterior"},
-              {"nombre": "Cruces inversos en polea alta", "activacion_principal": "Deltoides posterior, romboides"},
-              {"nombre": "Remo alto con barra", "activacion_principal": "Deltoides lateral, trapecio superior"}
-            ]
+              {
+                "nombre": "Press Militar (barra o mancuernas)",
+                "activacion_principal": "Deltoides anterior y medio",
+              },
+              {
+                "nombre": "Elevación lateral con mancuernas",
+                "activacion_principal": "Deltoides medio",
+              },
+              {
+                "nombre": "Elevación frontal con mancuernas",
+                "activacion_principal": "Deltoides anterior",
+              },
+              {
+                "nombre": "Cruces inversos en polea alta",
+                "activacion_principal": "Deltoides posterior, romboides",
+              },
+              {
+                "nombre": "Remo alto con barra",
+                "activacion_principal": "Deltoides lateral, trapecio superior",
+              },
+            ],
           },
           {
             "grupo_muscular": "Piernas",
             "ejercicios": [
-              {"nombre": "Sentadilla frontal", "activacion_principal": "Cuádriceps, core, glúteos"},
-              {"nombre": "Peso muerto rumano (barra o mancuernas)", "activacion_principal": "Isquiotibiales, glúteo mayor"},
-              {"nombre": "Sentadilla búlgara", "activacion_principal": "Cuádriceps, glúteos, estabilizadores"},
-              {"nombre": "Extensión de piernas en máquina", "activacion_principal": "Cuádriceps (aislamiento)"},
-              {"nombre": "Curl de piernas sentado", "activacion_principal": "Isquiotibiales"}
-            ]
+              {
+                "nombre": "Sentadilla frontal",
+                "activacion_principal": "Cuádriceps, core, glúteos",
+              },
+              {
+                "nombre": "Peso muerto rumano (barra o mancuernas)",
+                "activacion_principal": "Isquiotibiales, glúteo mayor",
+              },
+              {
+                "nombre": "Sentadilla búlgara",
+                "activacion_principal": "Cuádriceps, glúteos, estabilizadores",
+              },
+              {
+                "nombre": "Extensión de piernas en máquina",
+                "activacion_principal": "Cuádriceps (aislamiento)",
+              },
+              {
+                "nombre": "Curl de piernas sentado",
+                "activacion_principal": "Isquiotibiales",
+              },
+            ],
           },
           {
             "grupo_muscular": "Brazos y Core",
             "ejercicios": [
-              {"nombre": "Curl de bíceps con barra", "activacion_principal": "Bíceps braquial"},
-              {"nombre": "Jalón en polea con cuerda (tríceps)", "activacion_principal": "Tríceps braquial"},
-              {"nombre": "Press francés", "activacion_principal": "Tríceps (cabeza larga)"},
-              {"nombre": "Crunch abdominal", "activacion_principal": "Recto abdominal"},
-              {"nombre": "Elevación de piernas", "activacion_principal": "Abdominales inferiores, flexores de cadera"}
-            ]
-          }
-        ]
+              {
+                "nombre": "Curl de bíceps con barra",
+                "activacion_principal": "Bíceps braquial",
+              },
+              {
+                "nombre": "Jalón en polea con cuerda (tríceps)",
+                "activacion_principal": "Tríceps braquial",
+              },
+              {
+                "nombre": "Press francés",
+                "activacion_principal": "Tríceps (cabeza larga)",
+              },
+              {
+                "nombre": "Crunch abdominal",
+                "activacion_principal": "Recto abdominal",
+              },
+              {
+                "nombre": "Elevación de piernas",
+                "activacion_principal":
+                    "Abdominales inferiores, flexores de cadera",
+              },
+            ],
+          },
+        ],
       };
 
       await db.transaction((txn) async {
@@ -344,7 +424,7 @@ class Ejercicioservice {
   Future<List<Map<String, dynamic>>> getPersonalRecords() async {
     final db = await DatabaseHelper.instance.database;
     return await db.rawQuery('''
-      SELECT pr.*, ej.nombre as ejercicioNombre
+      SELECT pr.*, ej.nombre as ejercicioNombre, ej.grupo as grupoNombre
       FROM record_personal pr
       INNER JOIN ejercicios ej ON pr.ejercicioId = ej.id
       ORDER BY ej.nombre ASC
