@@ -43,6 +43,7 @@ dependencies:
   path: ^1.9.1
   translator: 1.0.4+1 # Para traducir ejercicios on-the-fly
   cached_network_image: ^3.3.1 # Para cachear imágenes/gifs de los ejercicios
+  lottie: ^3.3.3
 
 dev_dependencies:
   flutter_test:

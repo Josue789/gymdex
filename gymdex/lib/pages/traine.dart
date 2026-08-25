@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:gymdex/models/ejercicio.dart';
 import 'package:gymdex/models/rutina.dart';
 import 'package:gymdex/service/ejercicioService.dart';
+import 'package:lottie/lottie.dart';
 
 class Traine extends StatefulWidget {
   const Traine({super.key, this.rutina});
@@ -17,11 +20,60 @@ class Traine extends StatefulWidget {
 class _TraineState extends State<Traine> {
   List<Map<String, dynamic>> ejercicios = [];
   int terminado = 0;
+  Timer? _countdownTimer;
+  String _weightUnit = 'KG';
 
   @override
   void initState() {
     super.initState();
+    // Cargar ejercicios de la rutina al iniciar la página
     loadEjercicios();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        int time = 3;
+        showCupertinoDialog(
+          context: context,
+          builder: (BuildContext dialogContext) => StatefulBuilder(
+            builder: (context, setDialogState) {
+              _countdownTimer ??= Timer.periodic(const Duration(seconds: 1), (
+                timer,
+              ) {
+                if (!mounted) {
+                  timer.cancel();
+                  return;
+                }
+
+                setDialogState(() {
+                  time--;
+                });
+                if (time == 0) {
+                  timer.cancel();
+                  _countdownTimer = null;
+                  Navigator.of(dialogContext).pop();
+                }
+              });
+
+              return CupertinoAlertDialog(
+                title: const Text("Comienza tu entrenamiento en"),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 10),
+                    Text(
+                      '$time',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      }
+    });
   }
 
   /// Cargar ejercicios de la rutina
@@ -69,6 +121,7 @@ class _TraineState extends State<Traine> {
 
   @override
   void dispose() {
+    _countdownTimer?.cancel();
     for (var ejercicio in ejercicios) {
       for (var set in (ejercicio['sets_data'] as List)) {
         set['weight_controller'].dispose();
@@ -80,98 +133,160 @@ class _TraineState extends State<Traine> {
 
   Color get _primaryColor => Colors.indigo.shade700;
 
+  Future<void> _confirmFinishWorkout() async {
+    final shouldFinish = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => CupertinoAlertDialog(
+        title: const Text("Finalizar entrenamiento"),
+        content: const Text(
+          "¿Estás seguro de que deseas finalizar el entrenamiento?",
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text("Cancelar"),
+            onPressed: () => Navigator.pop(dialogContext, false),
+          ),
+          CupertinoDialogAction(
+            child: const Text("Finalizar"),
+            onPressed: () => Navigator.pop(dialogContext, true),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldFinish == true && mounted) {
+      await _finishWorkout();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.rutina?.nombre ?? 'Entrenamiento'),
-        backgroundColor: _primaryColor,
-      ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: FloatingActionButton.extended(
-          backgroundColor: Colors.red.shade700,
-          foregroundColor: Colors.white,
-          onPressed: _finishWorkout,
-          icon: const Icon(Icons.stop_rounded),
-          label: const Text('Finalizar entrenamiento'),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          _confirmFinishWorkout();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(widget.rutina?.nombre ?? 'Entrenamiento'),
+          backgroundColor: _primaryColor,
         ),
-      ),
-      body: GestureDetector(
-        onTap: () => FocusScope.of(context).unfocus(),
-        child: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Card(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  elevation: 2,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Progreso de rutina',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+        floatingActionButton: Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: FloatingActionButton.extended(
+            backgroundColor: Colors.red.shade700,
+            foregroundColor: Colors.white,
+            onPressed: _confirmFinishWorkout,
+            icon: const Icon(Icons.stop_rounded),
+            label: const Text('Finalizar entrenamiento'),
+          ),
+        ),
+        body: GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Card(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    elevation: 2,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Progreso de rutina',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '${terminado} / ${ejercicios.length} ejercicios completos',
-                                style: const TextStyle(color: Colors.grey),
-                              ),
-                              const SizedBox(height: 12),
-                              LinearProgressIndicator(
-                                minHeight: 10,
-                                value: ejercicios.isEmpty
-                                    ? 0
-                                    : terminado / ejercicios.length,
-                                color: Colors.lightBlueAccent,
-                                backgroundColor: Colors.grey.shade300,
-                              ),
-                            ],
+                                const SizedBox(height: 8),
+                                Text(
+                                  '${terminado} / ${ejercicios.length} ejercicios completos',
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
+                                const SizedBox(height: 12),
+                                LinearProgressIndicator(
+                                  minHeight: 10,
+                                  value: ejercicios.isEmpty
+                                      ? 0
+                                      : terminado / ejercicios.length,
+                                  color: Colors.lightBlueAccent,
+                                  backgroundColor: Colors.grey.shade300,
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('Unidad de peso'),
+                                    DropdownButton<String>(
+                                      value: _weightUnit,
+                                      items: const [
+                                        DropdownMenuItem(
+                                          value: 'KG',
+                                          child: Text('KG'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 'LBS',
+                                          child: Text('LBS'),
+                                        ),
+                                      ],
+                                      onChanged: (value) {
+                                        if (value != null) {
+                                          setState(() {
+                                            _weightUnit = value;
+                                          });
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: _primaryColor.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(16),
+                          const SizedBox(width: 12),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: _primaryColor.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Icon(
+                              Icons.fitness_center,
+                              color: Colors.indigo,
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.fitness_center,
-                            color: Colors.indigo,
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    itemCount: ejercicios.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      return _buildExerciseCard(ejercicios[index]);
+                    },
                   ),
-                  itemCount: ejercicios.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    return _buildExerciseCard(ejercicios[index]);
-                  },
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -307,7 +422,7 @@ class _TraineState extends State<Traine> {
               textAlign: TextAlign.center,
               enabled: !isDone,
               decoration: InputDecoration(
-                hintText: 'kg',
+                hintText: _weightUnit.toLowerCase(),
                 filled: isDone,
                 fillColor: isDone
                     ? (isDark ? Colors.grey[800] : Colors.grey.shade100)
@@ -428,9 +543,17 @@ class _TraineState extends State<Traine> {
             title: const Text("Rutina terminada"),
             content: Column(
               mainAxisSize: MainAxisSize.min,
-              children: const [
-                SizedBox(height: 10),
-                Text("¡Buen trabajo! Has completado todos los ejercicios."),
+              children: [
+                const SizedBox(height: 10),
+                const Text(
+                  "¡Buen trabajo! Has completado todos los ejercicios.",
+                ),
+                Lottie.asset(
+                  'assets/Trophy.json',
+                  width: 100,
+                  height: 100,
+                  repeat: false,
+                ),
               ],
             ),
             actions: [
@@ -448,7 +571,7 @@ class _TraineState extends State<Traine> {
     });
   }
 
-  void _finishWorkout() async {
+  Future<void> _finishWorkout() async {
     final trainingId = await Ejercicioservice().saveTraining(widget.rutina?.id);
 
     if (trainingId != -1) {
@@ -458,8 +581,11 @@ class _TraineState extends State<Traine> {
 
         for (var set in sets) {
           if (set['is_done'] == true) {
-            final weight =
+            final enteredWeight =
                 double.tryParse(set['weight_controller'].text) ?? 0.0;
+            final weight = _weightUnit == 'LBS'
+                ? enteredWeight * 0.45359237
+                : enteredWeight;
             final reps = int.tryParse(set['reps_controller'].text) ?? 0;
             final setNum = set['set_number'];
 
